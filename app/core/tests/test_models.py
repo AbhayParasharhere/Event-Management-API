@@ -1,9 +1,11 @@
 """
 Tests for checking models.
 """
-
+from decimal import Decimal
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+
+from core.models import Event
 
 
 class ModelTests(TestCase):
@@ -68,3 +70,24 @@ class ModelTests(TestCase):
 
         self.assertTrue(user.is_superuser)
         self.assertTrue(user.is_staff)
+
+    def test_create_Event(self):
+        """Test creating an event is successful."""
+        user = get_user_model().objects.create_user(
+            email='test@example.com',
+            password='test123',
+            name='Test user',
+        )
+        event = Event.objects.create(
+            organizer=user,
+            title='Test Event',
+            description='Test Desc',
+            date='2023-09-19',
+            time='12:00:00',
+            venue='Test Venue',
+            ticket_price=Decimal('12.99'),
+            max_attendees=34,
+        )
+
+        self.assertEqual(str(event), 'Test Event')
+        self.assertEqual(event.organizer, user)

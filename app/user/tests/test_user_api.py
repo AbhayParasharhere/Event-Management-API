@@ -11,6 +11,7 @@ from rest_framework import status
 
 USER_URL = reverse('user:create')
 TOKEN_URL = reverse('user:token')
+ME_URL = reverse('user:me')
 
 
 def create_user(email='test@example.com', password='test123',
@@ -117,3 +118,76 @@ class PublicUserAPITests(TestCase):
 
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertNotIn('token', res.data)
+
+    def test_retrieve_user_details_unauthorized_fails(self):
+        """Test retreiving user details in unauthorized request fails. """
+        res = self.client.get(ME_URL)
+
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertNotIn('email', res.data)
+
+
+class PrivateUserApiTests(TestCase):
+    """Authorized requests test for the user api."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = create_user()
+        self.client.force_authenticate(self.user)
+
+    def test_retreive_user_details(self):
+        """Test retreiving user details for the authenticated user."""
+        res = self.client.get(ME_URL)
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data, {
+            'email': self.user.email,
+            'name': self.user.name,
+            'bio': self.user.bio,
+            'phone': self.user.phone
+        })
+
+    def test_post_me_not_allowed(self):
+        """Test that a post request is not allowed for the me url."""
+        res = self.client.post(ME_URL, {})
+
+        self.assertEqual(res.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_put_me_not_allowed(self):
+        """Test that a put request is not allowed for the me url."""
+        res = self.client.put(ME_URL, {})
+        self.assertEqual(res.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_update_profile(self):
+        """Test that users can update their profile data apart from email."""
+        self.user.bio = 'Prev Bio'
+        self.user.phone = '1234567890'
+
+        payload = {
+            'name': 'New Name',
+            'password': 'newPass123',
+            'bio': 'New Bio',
+            'phone': '0123456789'
+        }
+        res = self.client.patch(ME_URL, payload)
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+
+        self.assertEqual(self.user.email, 'test@example.com')
+        self.assertEqual(self.user.bio, payload['bio'])
+        self.assertEqual(self.user.phone, payload['phone'])
+        self.assertTrue(self.user.check_password(payload['password']))
+
+    def test_update_email_fails(self):
+        """Test updating an email is not allowed."""
+
+        payload = {
+            'email': 'updated@example.com'
+        }
+
+        res = self.client.patch(ME_URL, payload)
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, 'test@example.com')
