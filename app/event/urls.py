@@ -17,4 +17,6 @@ app_name = 'event'
 
 urlpatterns = [
     path('organized-events/', include(router.urls)),
+    path('all-events/', views.GetAllEvents.as_view({'get': 'list'}),
+         name='all-events'),
 ]
